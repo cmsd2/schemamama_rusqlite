@@ -2,6 +2,11 @@
 name = "schemamama_rusqlite"
 version = "0.1.0"
 authors = ["Chris Dawes <cmsd2@cantab.net>"]
+description = "Rusqlite SQLite3 adapter for the Schemamama migration system"
+readme = "README.md"
+keywords = ["schemamama", "database", "migration", "sqlite", "rusqlite"]
+license = "MIT"
+repository = "https://github.com/cmsd2/schemamama_rusqlite"
 
 [dependencies]
 schemamama = "0.0.8"
