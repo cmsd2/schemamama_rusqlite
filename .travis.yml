@@ -1,0 +1,23 @@
+
+language: rust
+
+rust:
+  - stable
+  - beta
+  - nightly
+
+before_script:
+  - pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
+
+# the main build
+script:
+  - |
+      travis-cargo build &&
+      travis-cargo test &&
+      travis-cargo doc
+
+after_success: 
+  - |
+      curl -O https://raw.githubusercontent.com/cmsd2/travis-doc-upload/master/travis-doc-upload.sh &&
+      sh -x travis-doc-upload.sh
+

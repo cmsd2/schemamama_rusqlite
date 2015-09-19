@@ -1,3 +1,65 @@
+//!##Example
+//!
+//!Setup the migrations:
+//!
+//!```
+//!#[macro_use]
+//!extern crate schemamama;
+//!extern crate schemamama_rusqlite;
+//!extern crate rusqlite;
+//!
+//!use schemamama::{Migration, Migrator};
+//!use schemamama_rusqlite::{SqliteAdapter, SqliteMigration};
+//!
+//!struct CreateUsers;
+//!// Instead of using sequential numbers (1, 2, 3...), you may instead choose to use a global
+//!// versioning scheme, such as epoch timestamps.
+//!migration!(CreateUsers, 1, "create users table");
+//!
+//!impl SqliteMigration for CreateUsers {
+//!    fn up(&self, conn: &rusqlite::SqliteConnection) -> SqliteResult<()> {
+//!        conn.execute("CREATE TABLE users (id BIGINT PRIMARY KEY);", &[]).map(|_| ())
+//!    }
+//!
+//!    fn down(&self, transaction: &postgres::Transaction) {
+//!        transaction.execute("DROP TABLE users;", &[]).unwrap().map(|_| ())
+//!    }
+//!}
+//!
+//!struct CreateProducts;
+//!migration!(CreateProducts, 2, "create products table");
+//!
+//!impl SqliteMigration for CreateProducts {
+//!    // ...
+//!}
+//!```
+//!
+//!Then, run the migrations!
+//!
+//!```
+//!let conn = SqliteConnection::open_in_memory().unwrap();
+//!let adapter = SqliteAdapter::new(&conn);
+//!
+//!// Create the metadata tables necessary for tracking migrations. This is safe to call more than
+//!// once (`CREATE TABLE IF NOT EXISTS schemamama` is used internally):
+//!adapter.setup_schema();
+//!
+//!let mut migrator = Migrator::new(adapter);
+//!
+//!migrator.register(Box::new(CreateUsers));
+//!migrator.register(Box::new(CreateProducts));
+//!
+//!// Execute migrations up to and including version 2:
+//!migrator.up(2);
+//!assert_eq!(migrator.current_version(), Some(1));
+//!
+//!// Reverse all migrations:
+//!migrator.down(None);
+//!assert_eq!(migrator.current_version(), None);
+//!```
+
+#![doc(html_root_url = "https://cmsd2.github.io/rust-docs/schemamama_rusqlite/schemamama_rusqlite/")]
+
 #[macro_use]
 extern crate schemamama;
 extern crate rusqlite;

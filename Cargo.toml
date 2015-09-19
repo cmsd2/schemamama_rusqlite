@@ -10,3 +10,6 @@ log = "*"
 
 [dev_dependencies]
 env_logger = "*"
+
+[features]
+unstable = []
