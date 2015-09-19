@@ -10,8 +10,6 @@ It is based on schemamama_postgres.
 ## Installation
 
 Rusqlite requires sqlite3 dev library to be installed.
-Don't forget you may need to pass in a custom value for the PKG_CONFIG_PATH
-environment variable if it is not installed in usual the system-wide locations.
 
 Then add Schemamama to your `Cargo.toml`:
 
@@ -21,6 +19,9 @@ schemamama = "*"
 schemamama_rusqlite = "*"
 rusqlite = "0.2.0"
 ```
+
+You may need to pass in a custom value for the PKG_CONFIG_PATH if rust is unable
+to locate your sqlite3 installation.
 
 ## Usage
 
@@ -45,7 +46,7 @@ impl SqliteMigration for CreateUsers {
         conn.execute("CREATE TABLE users (id BIGINT PRIMARY KEY);", &[]).map(|_| ())
     }
 
-    fn down(&self, transaction: &postgres::Transaction) {
+    fn down(&self, transaction: &postgres::Transaction) -> SqliteResult<()> {
         transaction.execute("DROP TABLE users;", &[]).unwrap().map(|_| ())
     }
 }
