@@ -1,11 +1,11 @@
 [package]
 name = "schemamama_rusqlite"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["Chris Dawes <cmsd2@cantab.net>"]
 description = "Rusqlite SQLite3 adapter for the Schemamama migration system"
 readme = "README.md"
 keywords = ["schemamama", "database", "migration", "sqlite", "rusqlite"]
-license = "MIT"
+license = "MIT/Apache-2.0"
 repository = "https://github.com/cmsd2/schemamama_rusqlite"
 documentation = "http://cmsd2.github.io/rust-docs/schemamama_rusqlite/schemamama_rusqlite/"
 
