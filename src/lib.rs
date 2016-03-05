@@ -11,6 +11,21 @@ use schemamama::{Adapter, Migration, Version};
 use std::collections::BTreeSet;
 use rusqlite::{SqliteConnection,SqliteResult,SqliteStatement};
 
+#[derive(Debug)]
+pub enum SqliteMigrationError {
+    UknownError,
+    RusqliteError(rusqlite::Error),
+    SqlError(String),
+}
+
+impl From<rusqlite::Error> for SqliteMigrationError {
+    fn from(err: rusqlite::Error) -> SqliteMigrationError {
+        SqliteMigrationError::RusqliteError(err)
+    }
+}
+
+pub type Result<T> = std::result::Result<T, SqliteMigrationError>;
+
 /// A migration to be used within a PostgreSQL connection.
 pub trait SqliteMigration : Migration {
     /// Called when this migration is to be executed. This function has an empty body by default,
@@ -93,45 +108,58 @@ impl<'a> SqliteAdapter<'a> {
 
 impl<'a> Adapter for SqliteAdapter<'a> {
     type MigrationType = SqliteMigration;
+
+    type Error = SqliteMigrationError;
     
     /// Panics if `setup_schema` hasn't previously been called or if the query otherwise fails.
-    fn current_version(&self) -> Option<Version> {
+    fn current_version(&self) -> Result<Option<Version>> {
         let query = "SELECT version FROM schemamama ORDER BY version DESC LIMIT 1;";
 
         let mut statement = self.prepare(query);
+        let mut rows = try!(statement.query(&[]));
 
-        let mut rows = statement.query(&[]).unwrap();
-
-        rows.next().map(|row| row.unwrap().get(0) )
+        if let Some(row_result) = rows.next() {
+            let val = try!(row_result).get(0);
+            Ok(Some(val))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Panics if `setup_schema` hasn't previously been called or if the query otherwise fails.
-    fn migrated_versions(&self) -> BTreeSet<Version> {
+    fn migrated_versions(&self) -> Result<BTreeSet<Version>> {
         let query = "SELECT version FROM schemamama;";
 
         let mut statement = self.prepare(query);
 
         let rows = statement.query(&[]).unwrap();
 
-        rows.map(|v| v.unwrap().get(0) ).collect()
+        rows.map(|row_result| {
+            let val = try!(row_result).get(0);
+            Ok(val)
+        }).collect()
     }
 
     /// Panics if `setup_schema` hasn't previously been called or if the migration otherwise fails.
-    fn apply_migration(&self, migration: &SqliteMigration) {
-        self.execute_transaction(|transaction| {
+    fn apply_migration(&self, migration: &SqliteMigration) -> Result<()> {
+        try!(self.execute_transaction(|transaction| {
             try!(migration.up(&transaction));
             try!(self.record_version(migration.version()));
             Ok(())
-        }).unwrap();
+        }));
+
+        Ok(())
     }
 
     /// Panics if `setup_schema` hasn't previously been called or if the migration otherwise fails.
-    fn revert_migration(&self, migration: &SqliteMigration) {
-        self.execute_transaction(|transaction| {
+    fn revert_migration(&self, migration: &SqliteMigration) -> Result<()> {
+        try!(self.execute_transaction(|transaction| {
             try!(migration.down(&transaction));
             try!(self.erase_version(migration.version()));
             Ok(())
-        }).unwrap();
+        }));
+
+        Ok(())
     }
 }
 
@@ -168,11 +196,12 @@ mod tests {
 
         migrator.register(Box::new(CreateUsers));
 
-        migrator.up(1);
+        migrator.up(1).unwrap();
 
-        assert_eq!(migrator.current_version(), Some(1));
+        assert_eq!(migrator.current_version().unwrap(), Some(1));
 
-        migrator.down(None);
-        assert_eq!(migrator.current_version(), None);
+        migrator.down(None).unwrap();
+        
+        assert_eq!(migrator.current_version().unwrap(), None);
     }
 }
