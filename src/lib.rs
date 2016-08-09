@@ -198,7 +198,7 @@ mod tests {
 
         migrator.register(Box::new(CreateUsers));
 
-        migrator.up(1).unwrap();
+        migrator.up(Some(1)).unwrap();
 
         assert_eq!(migrator.current_version().unwrap(), Some(1));
 
