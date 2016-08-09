@@ -44,9 +44,9 @@ pub struct SqliteAdapter<'a> {
     connection: &'a SqliteConnection
 }
 
-impl<'a> SqliteAdapter<'a> {
-    /// Create a new migrator tied to a PostgreSQL connection.
-    pub fn new(connection: &'a SqliteConnection) -> SqliteAdapter {
+impl <'a> SqliteAdapter<'a> {
+    /// Create a new migrator tied to a SQLite connection.
+    pub fn new(connection: &'a SqliteConnection) -> SqliteAdapter<'a> {
         SqliteAdapter { connection: connection }
     }
 
@@ -63,7 +63,7 @@ impl<'a> SqliteAdapter<'a> {
     // fails.
     fn record_version(&self, version: Version) -> SqliteResult<()> {
         let query = "INSERT INTO schemamama (version) VALUES ($1);";
-        let mut stmt = self.connection.prepare(query).unwrap();
+        let mut stmt = try!(self.connection.prepare(query));
         
         match stmt.execute(&[&version]) {
             Err(e) => {
@@ -92,21 +92,18 @@ impl<'a> SqliteAdapter<'a> {
     fn execute_transaction<F>(&self, block: F) -> SqliteResult<()> where F: Fn(&SqliteConnection) -> SqliteResult<()> {
         let tx = try!(self.connection.transaction());
         
-        try!(block(&self.connection));
+        try!(block(self.connection));
 
         tx.commit()
     }
 
-    fn prepare(&self, query: &str) -> SqliteStatement {
-        match self.connection.prepare(query) {
-            Ok(s) => s,
-            Err(e) => panic!("Query preparation failed: {:?}", e)
-        }
+    fn prepare(&self, query: &str) -> Result<SqliteStatement> {
+        self.connection.prepare(query).map_err(SqliteMigrationError::from)
     }
 
 }
 
-impl<'a> Adapter for SqliteAdapter<'a> {
+impl <'a> Adapter for SqliteAdapter<'a> {
     type MigrationType = SqliteMigration;
 
     type Error = SqliteMigrationError;
@@ -115,7 +112,7 @@ impl<'a> Adapter for SqliteAdapter<'a> {
     fn current_version(&self) -> Result<Option<Version>> {
         let query = "SELECT version FROM schemamama ORDER BY version DESC LIMIT 1;";
 
-        let mut statement = self.prepare(query);
+        let mut statement = try!(self.prepare(query));
         let mut rows = try!(statement.query(&[]));
 
         if let Some(row_result) = rows.next() {
@@ -130,14 +127,19 @@ impl<'a> Adapter for SqliteAdapter<'a> {
     fn migrated_versions(&self) -> Result<BTreeSet<Version>> {
         let query = "SELECT version FROM schemamama;";
 
-        let mut statement = self.prepare(query);
+        let mut statement = try!(self.prepare(query));
 
-        let rows = statement.query(&[]).unwrap();
+        let rows = try!(statement.query_map(&[], |row_result| {
+            row_result.get(0)
+        }));
 
-        rows.map(|row_result| {
-            let val = try!(row_result).get(0);
-            Ok(val)
-        }).collect()
+        let mut versions = BTreeSet::new();
+
+        for vresult in rows {
+            versions.insert(try!(vresult));
+        }
+
+        Ok(versions)
     }
 
     /// Panics if `setup_schema` hasn't previously been called or if the migration otherwise fails.
