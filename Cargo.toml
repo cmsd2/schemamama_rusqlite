@@ -1,6 +1,6 @@
 [package]
 name = "schemamama_rusqlite"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["Chris Dawes <cmsd2@cantab.net>"]
 description = "Rusqlite SQLite3 adapter for the Schemamama migration system"
 readme = "README.md"
@@ -10,8 +10,8 @@ repository = "https://github.com/cmsd2/schemamama_rusqlite"
 documentation = "http://cmsd2.github.io/rust-docs/schemamama_rusqlite/schemamama_rusqlite/"
 
 [dependencies]
-schemamama = "0.2.0"
-rusqlite = "0.6.0"
+schemamama = "0.2.1"
+rusqlite = "0.6.1"
 log = "~0.3.0"
 
 [dev_dependencies]
