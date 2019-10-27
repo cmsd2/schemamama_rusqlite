@@ -9,7 +9,7 @@ extern crate log;
 
 use schemamama::{Adapter, Migration, Version};
 use std::collections::BTreeSet;
-use rusqlite::{SqliteConnection,SqliteResult,SqliteStatement};
+use rusqlite::{Connection,Statement,NO_PARAMS, Transaction};
 
 #[derive(Debug)]
 pub enum SqliteMigrationError {
@@ -31,22 +31,22 @@ pub trait SqliteMigration : Migration {
     /// Called when this migration is to be executed. This function has an empty body by default,
     /// so its implementation is optional.
     #[allow(unused_variables)]
-    fn up(&self, conn: &SqliteConnection) -> SqliteResult<()> { Ok(()) }
+    fn up(&self, conn: &Transaction) -> rusqlite::Result<()> { Ok(()) }
 
     /// Called when this migration is to be reversed. This function has an empty body by default,
     /// so its implementation is optional.
     #[allow(unused_variables)]
-    fn down(&self, conn: &SqliteConnection) -> SqliteResult<()> { Ok(()) }
+    fn down(&self, conn: &Transaction) -> rusqlite::Result<()> { Ok(()) }
 }
 
 /// An adapter that allows its migrations to act upon PostgreSQL connection transactions.
 pub struct SqliteAdapter<'a> {
-    connection: &'a SqliteConnection
+    connection: &'a mut Connection
 }
 
 impl <'a> SqliteAdapter<'a> {
     /// Create a new migrator tied to a SQLite connection.
-    pub fn new(connection: &'a SqliteConnection) -> SqliteAdapter<'a> {
+    pub fn new(connection: &'a mut Connection) -> SqliteAdapter<'a> {
         SqliteAdapter { connection: connection }
     }
 
@@ -54,16 +54,16 @@ impl <'a> SqliteAdapter<'a> {
     /// exist, this function has no operation.
     pub fn setup_schema(&self) {
         let query = "CREATE TABLE IF NOT EXISTS schemamama (version BIGINT PRIMARY KEY);";
-        if let Err(e) = self.connection.execute(query, &[]) {
+        if let Err(e) = self.connection.execute(query, NO_PARAMS) {
             panic!("Schema setup failed: {:?}", e);
         }
     }
 
     // Panics if `setup_schema` hasn't previously been called or if the insertion query otherwise
     // fails.
-    fn record_version(&self, version: Version) -> SqliteResult<()> {
+    fn record_version(transaction: &Transaction, version: Version) -> rusqlite::Result<()> {
         let query = "INSERT INTO schemamama (version) VALUES ($1);";
-        let mut stmt = try!(self.connection.prepare(query));
+        let mut stmt = try!(transaction.prepare(query));
         
         match stmt.execute(&[&version]) {
             Err(e) => {
@@ -76,9 +76,9 @@ impl <'a> SqliteAdapter<'a> {
 
     // Panics if `setup_schema` hasn't previously been called or if the deletion query otherwise
     // fails.
-    fn erase_version(&self, version: Version) -> SqliteResult<()> {
+    fn erase_version(transaction: &Transaction, version: Version) -> rusqlite::Result<()> {
         let query = "DELETE FROM schemamama WHERE version = $1;";
-        let mut stmt = self.connection.prepare(query).unwrap();
+        let mut stmt = transaction.prepare(query).unwrap();
         
         match stmt.execute(&[&version]) {
             Err(e) => {
@@ -89,15 +89,15 @@ impl <'a> SqliteAdapter<'a> {
         }
     }
 
-    fn execute_transaction<F>(&self, block: F) -> SqliteResult<()> where F: Fn(&SqliteConnection) -> SqliteResult<()> {
+    fn execute_transaction<F>(&mut self, block: F) -> rusqlite::Result<()> where F: Fn(& Transaction) -> rusqlite::Result<()> {
         let tx = try!(self.connection.transaction());
         
-        try!(block(self.connection));
+        try!(block(&tx));
 
         tx.commit()
     }
 
-    fn prepare(&self, query: &str) -> Result<SqliteStatement> {
+    fn prepare(&self, query: &str) -> Result<Statement> {
         self.connection.prepare(query).map_err(SqliteMigrationError::from)
     }
 
@@ -109,27 +109,32 @@ impl <'a> Adapter for SqliteAdapter<'a> {
     type Error = SqliteMigrationError;
     
     /// Panics if `setup_schema` hasn't previously been called or if the query otherwise fails.
-    fn current_version(&self) -> Result<Option<Version>> {
+    fn current_version(&mut self) -> Result<Option<Version>> {
         let query = "SELECT version FROM schemamama ORDER BY version DESC LIMIT 1;";
 
-        let mut statement = try!(self.prepare(query));
-        let mut rows = try!(statement.query(&[]));
+        let mut statement = self.prepare(query)?;
+        let mut rows = statement.query(NO_PARAMS)?;
 
-        if let Some(row_result) = rows.next() {
-            let val = try!(row_result).get(0);
-            Ok(Some(val))
+        let next = rows.next();
+        if let Ok(row_result) = next {
+            if let Some(val) = row_result {
+                Ok(Some(val.get(0)?))
+            } else {
+                // No rows exist
+                Ok(None)
+            }
         } else {
-            Ok(None)
+            next.map(|_|None).map_err(SqliteMigrationError::from)
         }
     }
 
     /// Panics if `setup_schema` hasn't previously been called or if the query otherwise fails.
-    fn migrated_versions(&self) -> Result<BTreeSet<Version>> {
+    fn migrated_versions(&mut self) -> Result<BTreeSet<Version>> {
         let query = "SELECT version FROM schemamama;";
 
         let mut statement = try!(self.prepare(query));
 
-        let rows = try!(statement.query_map(&[], |row_result| {
+        let rows = try!(statement.query_map(NO_PARAMS, |row_result| {
             row_result.get(0)
         }));
 
@@ -143,10 +148,10 @@ impl <'a> Adapter for SqliteAdapter<'a> {
     }
 
     /// Panics if `setup_schema` hasn't previously been called or if the migration otherwise fails.
-    fn apply_migration(&self, migration: &SqliteMigration) -> Result<()> {
+    fn apply_migration(&mut self, migration: &SqliteMigration) -> Result<()> {
         try!(self.execute_transaction(|transaction| {
             try!(migration.up(&transaction));
-            try!(self.record_version(migration.version()));
+            try!(SqliteAdapter::record_version(&transaction, migration.version()));
             Ok(())
         }));
 
@@ -154,10 +159,10 @@ impl <'a> Adapter for SqliteAdapter<'a> {
     }
 
     /// Panics if `setup_schema` hasn't previously been called or if the migration otherwise fails.
-    fn revert_migration(&self, migration: &SqliteMigration) -> Result<()> {
+    fn revert_migration(&mut self, migration: &SqliteMigration) -> Result<()> {
         try!(self.execute_transaction(|transaction| {
             try!(migration.down(&transaction));
-            try!(self.erase_version(migration.version()));
+            try!(SqliteAdapter::erase_version(&transaction, migration.version()));
             Ok(())
         }));
 
@@ -170,27 +175,27 @@ mod tests {
     use super::{SqliteMigration,SqliteAdapter};
 
     use schemamama::{Migrator};
-    use rusqlite::{SqliteConnection,SqliteResult};
+    use rusqlite::{Connection, NO_PARAMS, Transaction};
 
     
     struct CreateUsers;
     migration!(CreateUsers, 1, "create users table");
 
     impl SqliteMigration for CreateUsers {
-        fn up(&self, conn: &SqliteConnection) -> SqliteResult<()> {
-            conn.execute("CREATE TABLE users (id BIGINT PRIMARY KEY);", &[]).map(|_| ())
+        fn up(&self, conn: &Transaction) -> rusqlite::Result<()> {
+            conn.execute("CREATE TABLE users (id BIGINT PRIMARY KEY);", NO_PARAMS).map(|_| ())
         }
         
-        fn down(&self, conn: &SqliteConnection) -> SqliteResult<()> {
-            conn.execute("DROP TABLE users;", &[]).map(|_| ())
+        fn down(&self, conn: &Transaction) -> rusqlite::Result<()> {
+            conn.execute("DROP TABLE users;", NO_PARAMS).map(|_| ())
         }
     }
 
     #[test]
     pub fn test_register() {
-        let conn = SqliteConnection::open_in_memory().unwrap();
+        let mut conn = Connection::open_in_memory().unwrap();
 
-        let adapter = SqliteAdapter::new(&conn);
+        let adapter = SqliteAdapter::new(&mut conn);
 
         adapter.setup_schema();
 

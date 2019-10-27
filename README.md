@@ -42,11 +42,11 @@ struct CreateUsers;
 migration!(CreateUsers, 1, "create users table");
 
 impl SqliteMigration for CreateUsers {
-    fn up(&self, conn: &rusqlite::SqliteConnection) -> SqliteResult<()> {
+    fn up(&self, transaction: &rusqlite::Transaction) -> Result<()> {
         conn.execute("CREATE TABLE users (id BIGINT PRIMARY KEY);", &[]).map(|_| ())
     }
 
-    fn down(&self, transaction: &postgres::Transaction) -> SqliteResult<()> {
+    fn down(&self, transaction: &rusqlite::Transaction) -> Result<()> {
         transaction.execute("DROP TABLE users;", &[]).unwrap().map(|_| ())
     }
 }
@@ -62,7 +62,7 @@ impl SqliteMigration for CreateProducts {
 Then, run the migrations!
 
 ```rust
-let conn = SqliteConnection::open_in_memory().unwrap();
+let conn = Connection::open_in_memory().unwrap();
 let adapter = SqliteAdapter::new(&conn);
 
 // Create the metadata tables necessary for tracking migrations. This is safe to call more than
