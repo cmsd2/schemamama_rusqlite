@@ -47,7 +47,7 @@ pub struct SqliteAdapter<'a> {
 impl <'a> SqliteAdapter<'a> {
     /// Create a new migrator tied to a SQLite connection.
     pub fn new(connection: &'a mut Connection) -> SqliteAdapter<'a> {
-        SqliteAdapter { connection: connection }
+        SqliteAdapter { connection }
     }
 
     /// Create the tables Schemamama requires to keep track of schema state. If the tables already
@@ -63,7 +63,7 @@ impl <'a> SqliteAdapter<'a> {
     // fails.
     fn record_version(transaction: &Transaction, version: Version) -> rusqlite::Result<()> {
         let query = "INSERT INTO schemamama (version) VALUES ($1);";
-        let mut stmt = try!(transaction.prepare(query));
+        let mut stmt = transaction.prepare(query)?;
         
         match stmt.execute(&[&version]) {
             Err(e) => {
@@ -90,9 +90,9 @@ impl <'a> SqliteAdapter<'a> {
     }
 
     fn execute_transaction<F>(&mut self, block: F) -> rusqlite::Result<()> where F: Fn(& Transaction) -> rusqlite::Result<()> {
-        let tx = try!(self.connection.transaction());
+        let tx = self.connection.transaction()?;
         
-        try!(block(&tx));
+        block(&tx)?;
 
         tx.commit()
     }
@@ -104,7 +104,7 @@ impl <'a> SqliteAdapter<'a> {
 }
 
 impl <'a> Adapter for SqliteAdapter<'a> {
-    type MigrationType = SqliteMigration;
+    type MigrationType = dyn SqliteMigration;
 
     type Error = SqliteMigrationError;
     
@@ -132,39 +132,39 @@ impl <'a> Adapter for SqliteAdapter<'a> {
     fn migrated_versions(&mut self) -> Result<BTreeSet<Version>> {
         let query = "SELECT version FROM schemamama;";
 
-        let mut statement = try!(self.prepare(query));
+        let mut statement = self.prepare(query)?;
 
-        let rows = try!(statement.query_map(NO_PARAMS, |row_result| {
+        let rows = statement.query_map(NO_PARAMS, |row_result| {
             row_result.get(0)
-        }));
+        })?;
 
         let mut versions = BTreeSet::new();
 
         for vresult in rows {
-            versions.insert(try!(vresult));
+            versions.insert(vresult?);
         }
 
         Ok(versions)
     }
 
     /// Panics if `setup_schema` hasn't previously been called or if the migration otherwise fails.
-    fn apply_migration(&mut self, migration: &SqliteMigration) -> Result<()> {
-        try!(self.execute_transaction(|transaction| {
-            try!(migration.up(&transaction));
-            try!(SqliteAdapter::record_version(&transaction, migration.version()));
+    fn apply_migration(&mut self, migration: &dyn SqliteMigration) -> Result<()> {
+        self.execute_transaction(|transaction| {
+            migration.up(&transaction)?;
+            SqliteAdapter::record_version(&transaction, migration.version())?;
             Ok(())
-        }));
+        })?;
 
         Ok(())
     }
 
     /// Panics if `setup_schema` hasn't previously been called or if the migration otherwise fails.
-    fn revert_migration(&mut self, migration: &SqliteMigration) -> Result<()> {
-        try!(self.execute_transaction(|transaction| {
-            try!(migration.down(&transaction));
-            try!(SqliteAdapter::erase_version(&transaction, migration.version()));
+    fn revert_migration(&mut self, migration: &dyn SqliteMigration) -> Result<()> {
+        self.execute_transaction(|transaction| {
+            migration.down(&transaction)?;
+            SqliteAdapter::erase_version(&transaction, migration.version())?;
             Ok(())
-        }));
+        })?;
 
         Ok(())
     }
