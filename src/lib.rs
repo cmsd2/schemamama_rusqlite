@@ -3,12 +3,7 @@
 )]
 
 #[allow(unused_imports)]
-#[macro_use]
-extern crate schemamama;
-extern crate rusqlite;
-#[macro_use]
-extern crate log;
-
+use log::warn;
 use rusqlite::{
     Connection as SqliteConnection, Error as SqliteError, Result as SqliteResult, Row as SqliteRow,
 };
@@ -16,18 +11,16 @@ use schemamama::{Adapter, Migration, Version};
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::rc::Rc;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum SqliteMigrationError {
+    #[error("unknown error")]
     UknownError,
-    RusqliteError(SqliteError),
+    #[error("sqlite error")]
+    RusqliteError(#[from] SqliteError),
+    #[error("sql error")]
     SqlError(String),
-}
-
-impl From<SqliteError> for SqliteMigrationError {
-    fn from(err: SqliteError) -> SqliteMigrationError {
-        SqliteMigrationError::RusqliteError(err)
-    }
 }
 
 pub type Result<T> = std::result::Result<T, SqliteMigrationError>;
@@ -200,7 +193,7 @@ mod tests {
     use super::{SqliteAdapter, SqliteMigration};
 
     use rusqlite::{Connection as SqliteConnection, Result as SqliteResult};
-    use schemamama::Migrator;
+    use schemamama::{migration, Migrator};
     use std::cell::RefCell;
     use std::rc::Rc;
 

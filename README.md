@@ -1,4 +1,3 @@
-
 # Rusqlite for Schemamama
 
 A Rusqlite SQLite3 adapter for the lightweight database migration system
@@ -42,12 +41,12 @@ struct CreateUsers;
 migration!(CreateUsers, 1, "create users table");
 
 impl SqliteMigration for CreateUsers {
-    fn up(&self, conn: &rusqlite::SqliteConnection) -> SqliteResult<()> {
-        conn.execute("CREATE TABLE users (id BIGINT PRIMARY KEY);", &[]).map(|_| ())
+    fn up(&self, conn: &rusqlite::Connection) -> SqliteResult<()> {
+        conn.execute("CREATE TABLE users (id BIGINT PRIMARY KEY);", []).map(|_| ())
     }
 
-    fn down(&self, transaction: &postgres::Transaction) -> SqliteResult<()> {
-        transaction.execute("DROP TABLE users;", &[]).unwrap().map(|_| ())
+    fn down(&self, transaction: &rusqlite::Connection) -> SqliteResult<()> {
+        transaction.execute("DROP TABLE users;", []).map(|_| ())
     }
 }
 
@@ -62,8 +61,8 @@ impl SqliteMigration for CreateProducts {
 Then, run the migrations!
 
 ```rust
-let conn = SqliteConnection::open_in_memory().unwrap();
-let adapter = SqliteAdapter::new(&conn);
+let conn = Rc::new(RefCell::new(SqliteConnection::open_in_memory().expect("open db")));
+let adapter = SqliteAdapter::new(conn);
 
 // Create the metadata tables necessary for tracking migrations. This is safe to call more than
 // once (`CREATE TABLE IF NOT EXISTS schemamama` is used internally):
@@ -75,32 +74,32 @@ migrator.register(Box::new(CreateUsers));
 migrator.register(Box::new(CreateProducts));
 
 // Execute migrations up to and including version 2:
-migrator.up(2);
-assert_eq!(migrator.current_version(), Some(1));
+migrator.up(Some(2));
+assert_eq!(migrator.current_version().expect("current version"), Some(2));
 
 // Reverse all migrations:
 migrator.down(None);
-assert_eq!(migrator.current_version(), None);
+assert_eq!(migrator.current_version().expect("current version"), None);
 ```
 
 ## Testing
 
-Run ```cargo test```
+Run `cargo test`
 
 ## To-do
 
-* Make metadata table name configurable (currently locked in to `schemamama`).
+- Make metadata table name configurable (currently locked in to `schemamama`).
 
 ## License
 
 Licensed under either of
- * Apache License, Version 2.0 ([LICENSE-APACHE-2.0](LICENSE-APACHE-2.0) or http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
-at your option.
+
+- Apache License, Version 2.0 ([LICENSE-APACHE-2.0](LICENSE-APACHE-2.0) or http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+  at your option.
 
 ### Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you shall be dual licensed as above, without any
 additional terms or conditions.
-
