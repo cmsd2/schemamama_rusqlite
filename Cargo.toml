@@ -1,6 +1,6 @@
 [package]
 name = "schemamama_rusqlite"
-version = "0.9.0"
+version = "0.9.1"
 authors = ["Chris Dawes <cmsd2@cantab.net>"]
 description = "Rusqlite SQLite3 adapter for the Schemamama migration system"
 readme = "README.md"

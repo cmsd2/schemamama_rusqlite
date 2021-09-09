@@ -11,7 +11,6 @@ extern crate log;
 
 use rusqlite::{
     Connection as SqliteConnection, Error as SqliteError, Result as SqliteResult, Row as SqliteRow,
-    NO_PARAMS,
 };
 use schemamama::{Adapter, Migration, Version};
 use std::cell::RefCell;
@@ -69,7 +68,7 @@ impl SqliteAdapter {
         let conn = self.connection.borrow();
 
         let query = "CREATE TABLE IF NOT EXISTS schemamama (version BIGINT PRIMARY KEY);";
-        if let Err(e) = conn.execute(query, NO_PARAMS) {
+        if let Err(e) = conn.execute(query, []) {
             panic!("Schema setup failed: {:?}", e);
         }
     }
@@ -123,7 +122,7 @@ impl SqliteAdapter {
     {
         let conn = self.connection.borrow();
 
-        let result = conn.query_row(q, NO_PARAMS, block)?;
+        let result = conn.query_row(q, [], block)?;
 
         Ok(result)
     }
@@ -136,7 +135,7 @@ impl SqliteAdapter {
 
         let mut statement = conn.prepare(q)?;
 
-        let result = statement.query_map(NO_PARAMS, block)?;
+        let result = statement.query_map([], block)?;
 
         result.collect()
     }
@@ -200,7 +199,7 @@ impl Adapter for SqliteAdapter {
 mod tests {
     use super::{SqliteAdapter, SqliteMigration};
 
-    use rusqlite::{Connection as SqliteConnection, Result as SqliteResult, NO_PARAMS};
+    use rusqlite::{Connection as SqliteConnection, Result as SqliteResult};
     use schemamama::Migrator;
     use std::cell::RefCell;
     use std::rc::Rc;
@@ -210,12 +209,12 @@ mod tests {
 
     impl SqliteMigration for CreateUsers {
         fn up(&self, conn: &SqliteConnection) -> SqliteResult<()> {
-            conn.execute("CREATE TABLE users (id BIGINT PRIMARY KEY);", NO_PARAMS)
+            conn.execute("CREATE TABLE users (id BIGINT PRIMARY KEY);", [])
                 .map(|_| ())
         }
 
         fn down(&self, conn: &SqliteConnection) -> SqliteResult<()> {
-            conn.execute("DROP TABLE users;", NO_PARAMS).map(|_| ())
+            conn.execute("DROP TABLE users;", []).map(|_| ())
         }
     }
 
