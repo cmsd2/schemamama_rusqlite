@@ -16,7 +16,7 @@ Then add Schemamama to your `Cargo.toml`:
 [dependencies]
 schemamama = "*"
 schemamama_rusqlite = "*"
-rusqlite = "0.2.0"
+rusqlite = "0.32.0"
 ```
 
 You may need to pass in a custom value for the PKG_CONFIG_PATH if rust is unable
@@ -24,16 +24,16 @@ to locate your sqlite3 installation.
 
 ## Compatability
 
-|This package|Rusqlite|libqlite3-sys|
-|------------|--------|-------------|
-|0.10        |0.25    |0.22         |
-|0.11        |0.26    |0.23         |
-|0.12        |0.27    |0.24         |
-|0.13        |0.28    |0.25         |
-|0.14        |0.29    |0.26         |
-|0.15        |0.30    |0.27         |
-|0.16        |0.31    |0.28         |
-|0.17        |0.32    |0.30         |
+|This package|Rusqlite|libsqlite3-sys|
+|------------|--------|--------------|
+|0.10        |0.25    |0.22          |
+|0.11        |0.26    |0.23          |
+|0.12        |0.27    |0.24          |
+|0.13        |0.28    |0.25          |
+|0.14        |0.29    |0.26          |
+|0.15        |0.30    |0.27          |
+|0.16        |0.31    |0.28          |
+|0.17        |0.32    |0.30          |
 
 ## Usage
 
