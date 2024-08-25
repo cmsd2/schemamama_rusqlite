@@ -22,6 +22,13 @@ rusqlite = "0.2.0"
 You may need to pass in a custom value for the PKG_CONFIG_PATH if rust is unable
 to locate your sqlite3 installation.
 
+## Compatability
+
+|This package|Rusqlite|libqlite3-sys|
+|============|========|=============|
+|0.10        |0.25    |0.22         |
+|0.11        |0.26    |0.23         |
+
 ## Usage
 
 First, define some migrations:

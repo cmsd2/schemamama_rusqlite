@@ -1,6 +1,6 @@
 [package]
 name = "schemamama_rusqlite"
-version = "0.10.0"
+version = "0.11.0"
 authors = ["Chris Dawes <cmsd2@cantab.net>"]
 description = "Rusqlite SQLite3 adapter for the Schemamama migration system"
 readme = "README.md"
@@ -12,12 +12,12 @@ edition = "2018"
 
 [dependencies]
 schemamama = "0.3.0"
-rusqlite = "0.25.3"
+rusqlite = "0.26.0"
 log = "0.4.13"
 thiserror = "1.0.25"
 
 [dev_dependencies]
-env_logger = "~0.3.0"
+env_logger = "~0.11.0"
 
 [features]
 unstable = []
