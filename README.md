@@ -25,10 +25,11 @@ to locate your sqlite3 installation.
 ## Compatability
 
 |This package|Rusqlite|libqlite3-sys|
-|============|========|=============|
+|------------|--------|-------------|
 |0.10        |0.25    |0.22         |
 |0.11        |0.26    |0.23         |
 |0.12        |0.27    |0.24         |
+|0.13        |0.28    |0.25         |
 
 ## Usage
 
