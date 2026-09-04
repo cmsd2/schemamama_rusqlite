@@ -55,6 +55,10 @@ rather than returning an error, and `current_version` maps `QueryReturnedNoRows`
 
 ## Releasing
 
+**Use the `bump-rusqlite` skill** (`.claude/skills/bump-rusqlite/SKILL.md`) for any rusqlite
+upgrade or release; it carries the full procedure, including how to trial a new version without
+committing. The summary below is what that skill enforces.
+
 Version bumps track rusqlite releases one-for-one: this crate's only reason to release a new
 version is to follow a new rusqlite. A release does three things in the same change:
 
