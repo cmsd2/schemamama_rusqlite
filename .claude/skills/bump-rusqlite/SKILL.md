@@ -1,84 +1,94 @@
 ---
 name: bump-rusqlite
-description: Upgrade this crate to a newer rusqlite release - retarget the dependency, fix whatever the new API breaks, update the README compatibility table, and verify. Use when asked to bump, upgrade or update rusqlite, to check whether a new rusqlite works, to cut a release, or when a new rusqlite version has shipped.
+description: Extend this crate's supported rusqlite range to cover a newer release - test the new version, raise the upper bound, move the CI matrix, and update the README. Use when asked to bump, upgrade or support a new rusqlite, to check whether a rusqlite version works, or when a new rusqlite has shipped.
 ---
 
-# Bump rusqlite
+# Extend the rusqlite range
 
-This crate exists to track rusqlite. A new rusqlite minor is the only reason it releases,
-and each release is one commit that moves the dependency, the crate version and the README
-compatibility table together.
+Since 0.18 this crate depends on a **range** of rusqlite versions, not one:
 
-Ask whether the user wants a **trial** (find out what breaks, leave nothing committed) or a
-**release** (commit, and optionally publish). Default to a trial if they only asked whether a
-version works.
+```toml
+rusqlite = ">=0.28, <0.41"
+```
 
-## 1. Pick the target
+That range is the fix for [issue #6](https://github.com/cmsd2/schemamama_rusqlite/issues/6).
+`libsqlite3-sys` is a `links = "sqlite3"` crate and Cargo permits one per graph, so a single
+pinned rusqlite made this crate unusable alongside any project on a different rusqlite. Supporting
+a range lets Cargo unify on the downstream project's choice.
+
+**The job is now raising the upper bound, not moving a pin.** Do not narrow the range back to one
+version. If a change seems to require that, stop and raise it with the user.
+
+Ask whether this is a **trial** (find out whether a version works, commit nothing) or a
+**release**. Default to a trial if they only asked whether a version works.
+
+## 1. Find out whether the new version already works
+
+Usually it does. The crate uses a small part of the rusqlite API and has gone whole spans of
+releases untouched: 0.28 through 0.40 needed no source changes at all.
 
 ```bash
 cargo search rusqlite --limit 1        # latest published
-grep -n '^rusqlite' Cargo.toml         # where we are now
+grep -n '^rusqlite' Cargo.toml         # the range we currently claim
 ```
 
-rusqlite breaks its API most minors. **If the crate is more than one minor behind, go one minor
-at a time** unless told otherwise: each hop is a small, comprehensible diff, and a compile error
-after eight hops tells you nothing about which hop caused it. Every intermediate hop still gets
-its own README row, because users pin to those versions.
-
-Get the version to bump to, then check what actually changed before editing anything:
+Test the candidate against the current source before editing anything:
 
 ```bash
-gh api repos/rusqlite/rusqlite/releases --jq '.[] | "\(.tag_name)\t\(.published_at[:10])"' | head -20
-gh api repos/rusqlite/rusqlite/releases/tags/v<target> --jq .body
+cargo update -p rusqlite --precise <version>   # only works inside the current range
+cargo test
 ```
 
-## 2. Move the dependency
+If the version is above the upper bound, `--precise` refuses it. Widen the bound in `Cargo.toml`
+first, then run the above. Restore with `rm Cargo.lock && cargo update` if you are only trialling.
 
-Edit `Cargo.toml`: set `rusqlite` to the target, and raise the crate's own `version` by one
-minor. The mapping is one-to-one and has been since 0.10 — rusqlite 0.32 is this crate 0.17,
-rusqlite 0.33 is 0.18, and so on. Never skip a crate minor even when skipping rusqlite minors.
+## 2. If it does not compile
 
-## 3. Fix the breakage
+The crate touches `Connection`, `Transaction`, `Statement::execute`, `query_row`, `query_map`,
+`Row::get` and the `Error` enum. Breakage lands in parameter passing and error types. Past hops
+needed `NO_PARAMS` replaced by `[]`, and a borrow dropped from `stmt.execute(&[&version])`.
 
-```bash
-cargo build 2>&1 | head -40
+If `Error` renames or removes variants, check `current_version` in the `Adapter` impl: it matches
+`SqliteError::QueryReturnedNoRows` to return `Ok(None)`, so a rename there becomes a behaviour
+change rather than a compile error.
+
+Two outcomes worth separating:
+
+- **A fix that compiles across the whole range.** Make it and keep the range whole.
+- **A fix that only works above some version.** The range would have to be split with `cfg` or
+  cut at the bottom. Stop and tell the user. Raising the lower bound drops support for projects
+  on older rusqlite, which is the problem #6 was about, so it is their call and not a routine step.
+
+Never change the signature of `SqliteMigration::up` or `down`. They take `&rusqlite::Connection`
+and every downstream migration implements them. If rusqlite forces a change there, stop.
+
+## 3. Raise the bound
+
+In `Cargo.toml`, move the upper bound to just above the new version and raise the crate's own
+`version` by one minor:
+
+```toml
+rusqlite = ">=0.28, <0.42"
 ```
 
-`src/lib.rs` is the only source file, about 230 lines, and touches a narrow part of rusqlite:
-`Connection`, `Transaction`, `Statement::execute`, `query_row`, `query_map`, `Row::get`, and the
-`Error` enum. Breakage lands in the parameter-passing and error types. Past hops needed:
+The bound is exclusive, so supporting 0.41 means `<0.42`. The old one-to-one mapping between this
+crate's minor and rusqlite's is dead; do not try to preserve it.
 
-- `NO_PARAMS` deprecated in favour of `[]` (commit a6be765).
-- `stmt.execute(&[&version])` losing its borrow, becoming `stmt.execute([&version])`.
+## 4. Move the CI matrix
 
-If `Error` gains or renames variants, check `current_version` in the `Adapter` impl — it matches
-`SqliteError::QueryReturnedNoRows` by name to return `Ok(None)`, and a rename there compiles
-into a behaviour change elsewhere rather than an error.
+`.github/workflows/ci.yml` has a `rusqlite-range` job pinning the two ends of the range. **Update
+the top entry to the new version.** A range CI does not test is a claim, not a guarantee, and the
+matrix drifting from `Cargo.toml` is the failure this job exists to prevent.
 
-Keep the public API stable if you possibly can. `SqliteMigration::up`/`down` take
-`&rusqlite::Connection`, so a signature change there breaks every downstream migration. If a
-rusqlite release forces one, stop and tell the user before proceeding — that is a bigger
-decision than a version bump.
+## 5. Update the README
 
-## 4. Update the compatibility table
+The Compatability section states the supported range in prose, currently
+"**0.18 works with any rusqlite from 0.28 to 0.40.**" Update the crate version and the top of the
+range. The per-version table below it covers 0.10 to 0.17 only and is history; leave it alone.
 
-**This is the step that gets forgotten, and the one users depend on most.** The table in
-`README.md` maps each version of this crate to its rusqlite and libsqlite3-sys versions; a
-release without its row is unusable to anyone choosing a version.
+Check the install example's `rusqlite = "0.40"` line and its comment too.
 
-Read the libsqlite3-sys version off the resolved tree rather than guessing from the pattern —
-rusqlite does not raise it every minor:
-
-```bash
-cargo tree -p libsqlite3-sys | head -1
-```
-
-Add one row per crate minor, in order. Record the minor only (`0.30`, not `0.30.1`), matching
-the existing rows.
-
-## 5. Verify
-
-Everything CI enforces, in order:
+## 6. Verify
 
 ```bash
 cargo fmt --all --check
@@ -87,31 +97,30 @@ cargo test
 cargo doc --no-deps
 ```
 
-`cargo clippy --fix` handles most lint hits; a new rusqlite often trips new ones. Then confirm
-it builds on Linux against the system SQLite, which is what CI and most users get:
+Then both ends of the new range, which is what CI will do:
+
+```bash
+for v in 0.28.0 <new-top>; do
+  rm -f Cargo.lock && cargo update -q
+  cargo update -p rusqlite --precise "$v" && cargo test
+done
+rm -f Cargo.lock && cargo update -q
+```
+
+And the Linux build against the system SQLite:
 
 ```bash
 docker build -t schemamama_rusqlite .
 ```
 
-The Docker build runs the same checks, so a successful build is the whole gate. Skip it only if
-the daemon is not running, and say so rather than implying it passed.
+Skip Docker only if the daemon is not running, and say so rather than implying it passed.
 
-Check the README's usage example still compiles as written if the API changed — it is not a
-doctest, so nothing catches it drifting.
+## 7. Release
 
-## 6. Commit and release
-
-One commit per hop, containing `Cargo.toml`, `README.md` and any `src/lib.rs` fixes together.
-Never split the manifest and the table across commits. The existing history uses
-`bump versions` as the subject; keep it, and add a body when the hop needed source changes.
-
-Publishing is a separate job — hand off to the `release-crate` skill, which covers the
-preconditions, the dry run, tagging and the confirmation `cargo publish` requires. Do not
-publish from here.
+Hand off to the `release-crate` skill. Do not publish from here.
 
 ## Reporting a trial
 
-If this was a trial, leave the working tree dirty and report: the target version, what broke,
-what the fix would be, whether the public API survives unchanged, and the libsqlite3-sys version
-the new row would name. Do not commit.
+Leave the working tree dirty and report: the version tested, whether it compiled unchanged, what
+broke if anything, and whether the fix holds across the whole range or would force the lower bound
+up. Do not commit.

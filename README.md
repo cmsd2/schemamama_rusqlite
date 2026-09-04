@@ -18,15 +18,45 @@ Then add Schemamama to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-schemamama = "*"
-schemamama_rusqlite = "*"
-rusqlite = "0.32.0"
+schemamama = "0.3"
+schemamama_rusqlite = "0.18"
+rusqlite = "0.40"   # any version from 0.28 to 0.40
 ```
 
 You may need to pass in a custom value for the PKG_CONFIG_PATH if rust is unable
 to locate your sqlite3 installation.
 
 ## Compatability
+
+**0.18 works with any rusqlite from 0.28 to 0.40.**
+
+From 0.18 this package accepts a range rather than a single version, so you choose the
+rusqlite your project needs and this package follows. Whichever `libsqlite3-sys` your
+rusqlite pulls in is the one you get. CI tests both ends of the range on every commit.
+
+### Why the range matters
+
+`libsqlite3-sys` is a `links = "sqlite3"` crate, and Cargo allows only one such
+package in a dependency graph. Earlier versions of this package pinned a single
+rusqlite minor, so any project wanting a different one hit:
+
+```
+error: multiple packages link to native library `sqlite3`,
+       but a native library can be linked only once
+```
+
+That was [issue #6](https://github.com/cmsd2/schemamama_rusqlite/issues/6), and the
+range fixes it. Cargo resolves your rusqlite requirement and this package's range to
+a single version, so there is one `libsqlite3-sys` and no conflict.
+
+If you need a rusqlite newer than the top of the range, open an issue. Widening the
+range is usually a one-line change, because this package uses a small and stable part
+of the rusqlite API.
+
+### Older versions
+
+Versions before 0.18 pin exactly one rusqlite minor, and are subject to the conflict
+described above:
 
 |This package|Rusqlite|libsqlite3-sys|
 |------------|--------|--------------|

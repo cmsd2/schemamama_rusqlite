@@ -39,6 +39,12 @@ Two public items carry the whole design:
   needs `&mut Connection` while the read paths only need `&Connection`, and the `Rc` lets callers
   keep their own handle to the same connection.
 
+The `rusqlite` dependency is a **range** (`>=0.28, <0.41`), not a pin. `libsqlite3-sys` is a
+`links = "sqlite3"` crate, so Cargo permits exactly one in a dependency graph; a pinned rusqlite
+made this crate unusable in any project on a different rusqlite (issue #6). The range lets Cargo
+unify on the downstream project's choice. Do not narrow it back to a single version. The crate
+compiles unchanged across rusqlite 0.28 to 0.40, so the range costs nothing to hold.
+
 Migration state lives in a table literally named `schemamama` with one `version BIGINT PRIMARY KEY`
 column. `setup_schema()` creates it (`CREATE TABLE IF NOT EXISTS`, idempotent) and must be called
 before any adapter method; every `Adapter` method assumes the table exists. Making the table name
@@ -61,19 +67,15 @@ preconditions, what ships in the tarball, the `vX.Y.Z` lightweight tag on the bu
 the confirmation `cargo publish` requires before it runs. Use them rather than reconstructing
 the steps. The summary below is what they enforce.
 
-Version bumps track rusqlite releases one-for-one: this crate's only reason to release a new
-version is to follow a new rusqlite. A release does three things in the same change:
+Releases exist to extend the supported rusqlite range. A release moves three things together, and
+they must agree:
 
-1. Raise `version` in `Cargo.toml`.
-2. Raise the `rusqlite` dependency in `Cargo.toml`.
-3. **Add a row to the compatibility table in `README.md`** mapping the new crate version to its
-   rusqlite and libsqlite3-sys versions.
+1. `version` and the `rusqlite` range in `Cargo.toml`.
+2. The two ends of the `rusqlite-range` matrix in `.github/workflows/ci.yml`.
+3. The range stated in the README's Compatability section.
 
-Step 3 is not optional and is easy to forget. That table is how users pick a version of this crate,
-and a stale or missing row makes the release unusable to them. Find the libsqlite3-sys version by
-checking what the new rusqlite pins (`cargo tree -p libsqlite3-sys` after the bump, or rusqlite's
-own `Cargo.toml`) rather than guessing from the pattern of previous rows. Verify the table matches
-`Cargo.toml` before committing, and never bump `Cargo.toml` in one commit and the README in another.
+Never split those across commits. Up to 0.17 the crate pinned one rusqlite minor and the README
+carried a row per version; that table is now history and covers 0.10 to 0.17 only.
 
 ## CI
 

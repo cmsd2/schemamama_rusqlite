@@ -46,8 +46,8 @@ running, say so.
 ## 3. Choose the version
 
 Edit `version` in `Cargo.toml`. This crate is pre-1.0, so a breaking change is a minor bump and
-everything else is a patch. In practice releases exist to follow rusqlite, and those are always
-minor bumps with a fixed mapping — see `bump-rusqlite`.
+everything else is a patch. Extending the supported rusqlite range is a minor bump. There is no
+longer a fixed mapping between this crate's version and rusqlite's; see `bump-rusqlite`.
 
 Confirm the version is not already taken; the dry run warns rather than errors on this, so it is
 easy to miss:
@@ -56,9 +56,11 @@ easy to miss:
 cargo search schemamama_rusqlite --limit 1
 ```
 
-**If the release follows a rusqlite bump, the `README.md` compatibility table must already have
-its row.** Check before going further. A published version missing from that table is the one
-release mistake users actually notice.
+**If the release extends the supported rusqlite range, three things must already agree**: the
+range in `Cargo.toml`, the two ends of the `rusqlite-range` matrix in
+`.github/workflows/ci.yml`, and the range stated in the README's Compatability section. Check all
+three before going further. A published range that CI does not test, or that the README
+misstates, is the release mistake users actually notice.
 
 ## 4. Check what ships
 

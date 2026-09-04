@@ -38,6 +38,37 @@ jobs:
       - run: cargo build --verbose
       - run: cargo test --verbose
 
+  # The rusqlite requirement in Cargo.toml is a range, not a pin, so that downstream
+  # crates can bring their own rusqlite without hitting the libsqlite3-sys `links`
+  # conflict (issue #6). A range is only as good as its testing: these two entries are
+  # the ends of it, and must be moved whenever the range in Cargo.toml moves.
+  rusqlite-range:
+    name: rusqlite ${{ matrix.rusqlite }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rusqlite: ["0.28.0", "0.40.2"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install sqlite3 development library
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsqlite3-dev
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: rusqlite-${{ matrix.rusqlite }}
+
+      - name: Pin rusqlite ${{ matrix.rusqlite }}
+        run: cargo update -p rusqlite --precise ${{ matrix.rusqlite }}
+
+      - run: cargo test --verbose
+
   lint:
     name: fmt, clippy and doc
     runs-on: ubuntu-latest
