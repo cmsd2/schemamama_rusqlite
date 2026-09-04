@@ -55,9 +55,11 @@ rather than returning an error, and `current_version` maps `QueryReturnedNoRows`
 
 ## Releasing
 
-**Use the `bump-rusqlite` skill** (`.claude/skills/bump-rusqlite/SKILL.md`) for any rusqlite
-upgrade or release; it carries the full procedure, including how to trial a new version without
-committing. The summary below is what that skill enforces.
+Two project skills carry the procedure. **`bump-rusqlite`** moves the crate to a newer rusqlite,
+including how to trial a version without committing. **`release-crate`** publishes to crates.io:
+preconditions, what ships in the tarball, the `vX.Y.Z` lightweight tag on the bump commit, and
+the confirmation `cargo publish` requires before it runs. Use them rather than reconstructing
+the steps. The summary below is what they enforce.
 
 Version bumps track rusqlite releases one-for-one: this crate's only reason to release a new
 version is to follow a new rusqlite. A release does three things in the same change:

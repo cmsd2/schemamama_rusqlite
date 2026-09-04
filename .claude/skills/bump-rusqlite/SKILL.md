@@ -106,16 +106,9 @@ One commit per hop, containing `Cargo.toml`, `README.md` and any `src/lib.rs` fi
 Never split the manifest and the table across commits. The existing history uses
 `bump versions` as the subject; keep it, and add a body when the hop needed source changes.
 
-Publishing is the user's call — ask, do not assume:
-
-```bash
-cargo publish --dry-run
-cargo publish
-```
-
-`cargo publish` is irreversible: a version number on crates.io can be yanked but never reused.
-Confirm explicitly before running it. After publishing, docs.rs builds the documentation on its
-own; there is nothing to upload.
+Publishing is a separate job — hand off to the `release-crate` skill, which covers the
+preconditions, the dry run, tagging and the confirmation `cargo publish` requires. Do not
+publish from here.
 
 ## Reporting a trial
 
