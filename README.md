@@ -1,5 +1,9 @@
 # Rusqlite for Schemamama
 
+[![CI](https://github.com/cmsd2/schemamama_rusqlite/actions/workflows/ci.yml/badge.svg)](https://github.com/cmsd2/schemamama_rusqlite/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/schemamama_rusqlite.svg)](https://crates.io/crates/schemamama_rusqlite)
+[![docs.rs](https://docs.rs/schemamama_rusqlite/badge.svg)](https://docs.rs/schemamama_rusqlite)
+
 A Rusqlite SQLite3 adapter for the lightweight database migration system
 [Schemamama](https://github.com/SkylerLipthay/schemamama). Depends on the
 `rusqlite` crate.
@@ -97,7 +101,21 @@ assert_eq!(migrator.current_version().expect("current version"), None);
 
 ## Testing
 
-Run `cargo test`
+Run `cargo test`.
+
+CI runs on GitHub Actions (`.github/workflows/ci.yml`): build and test on stable and beta, plus
+`cargo fmt --check`, `cargo clippy -D warnings` and `cargo doc` on stable. Documentation is
+published by [docs.rs](https://docs.rs/schemamama_rusqlite) on each crates.io release.
+
+To run the same checks locally in a clean Linux environment, without installing sqlite3 headers on
+your machine:
+
+```
+docker build -t schemamama_rusqlite .
+```
+
+The build fails if any check fails. `docker run --rm -it schemamama_rusqlite` gives you a shell in
+that environment.
 
 ## To-do
 

@@ -1,6 +1,4 @@
-#![doc(
-    html_root_url = "https://cmsd2.github.io/rust-docs/schemamama_rusqlite/schemamama_rusqlite/"
-)]
+#![doc(html_root_url = "https://docs.rs/schemamama_rusqlite")]
 
 #[allow(unused_imports)]
 use log::warn;
@@ -50,9 +48,7 @@ pub struct SqliteAdapter {
 impl SqliteAdapter {
     /// Create a new migrator tied to a SQLite connection.
     pub fn new(connection: Rc<RefCell<SqliteConnection>>) -> SqliteAdapter {
-        SqliteAdapter {
-            connection: connection,
-        }
+        SqliteAdapter { connection }
     }
 
     /// Create the tables Schemamama requires to keep track of schema state. If the tables already
@@ -72,7 +68,7 @@ impl SqliteAdapter {
         let query = "INSERT INTO schemamama (version) VALUES ($1);";
         let mut stmt = conn.prepare(query)?;
 
-        match stmt.execute(&[&version]) {
+        match stmt.execute([&version]) {
             Err(e) => {
                 warn!("Failed to delete version {:?}: {:?}", version, e);
                 Err(e)
@@ -87,7 +83,7 @@ impl SqliteAdapter {
         let query = "DELETE FROM schemamama WHERE version = $1;";
         let mut stmt = conn.prepare(query).unwrap();
 
-        match stmt.execute(&[&version]) {
+        match stmt.execute([&version]) {
             Err(e) => {
                 warn!("Failed to delete version {:?}: {:?}", version, e);
                 Err(e)
@@ -168,7 +164,7 @@ impl Adapter for SqliteAdapter {
     /// Panics if `setup_schema` hasn't previously been called or if the migration otherwise fails.
     fn apply_migration(&self, migration: &dyn SqliteMigration) -> Result<()> {
         self.execute_transaction(|transaction| {
-            migration.up(&transaction)?;
+            migration.up(transaction)?;
             self.record_version(transaction, migration.version())?;
             Ok(())
         })?;
@@ -179,7 +175,7 @@ impl Adapter for SqliteAdapter {
     /// Panics if `setup_schema` hasn't previously been called or if the migration otherwise fails.
     fn revert_migration(&self, migration: &dyn SqliteMigration) -> Result<()> {
         self.execute_transaction(|transaction| {
-            migration.down(&transaction)?;
+            migration.down(transaction)?;
             self.erase_version(transaction, migration.version())?;
             Ok(())
         })?;
